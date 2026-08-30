@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spread Watch — Monitor de Arbitragem Multi-Rede</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg: #0a0c0f;
+    --bg-panel: #12151a;
+    --line: #22262e;
+    --text: #e9ebef;
+    --text-dim: #7b8290;
+    --green: #39ff88;
+    --amber: #ffb020;
+    --violet: #9b7cf7;
+    --red: #ff5c5c;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(155,124,247,0.08), transparent),
+      radial-gradient(ellipse 700px 400px at 100% 0%, rgba(57,255,136,0.05), transparent),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+  .wrap{ max-width: 1150px; margin: 0 auto; }
+
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap: wrap; gap: 16px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px; margin-bottom: 22px;
+  }
+  .brand{ display:flex; flex-direction:column; gap:4px; }
+  .brand .eyebrow{ font-family:'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--violet); }
+  .brand h1{ margin:0; font-size: 24px; font-weight:700; letter-spacing: -0.01em; }
+  .brand .sub{ color: var(--text-dim); font-size: 13px; max-width: 620px; }
+
+  .status-cluster{ display:flex; gap: 16px; font-family:'IBM Plex Mono', monospace; font-size:11.5px; flex-wrap:wrap; }
+  .status-item{ display:flex; align-items:center; gap:7px; color: var(--text-dim); }
+  .dot{ width:7px; height:7px; border-radius:50%; background: var(--text-dim); flex-shrink:0; }
+  .dot.ok{ background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.err{ background: var(--red); }
+  .dot.pending{ background: var(--amber); animation: blink 1.2s infinite; }
+  @keyframes blink{ 50%{ opacity:0.3; } }
+
+  .panel{
+    background: var(--bg-panel); border:1px solid var(--line); border-radius:10px;
+    padding: 16px 18px; margin-bottom: 14px;
+  }
+  .panel-title{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-bottom:12px; font-weight:600; }
+  .controls{ display:flex; gap: 14px; flex-wrap:wrap; align-items:flex-end; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+  .field input[type=number]{
+    background: #0d1014; border:1px solid var(--line); color:var(--text);
+    border-radius:7px; padding:8px 10px; font-family:'IBM Plex Mono', monospace; font-size:13px;
+    width: 120px;
+  }
+  .field input:focus{ outline:none; border-color: var(--violet); }
+  button{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    border-radius:7px; border:1px solid var(--line); cursor:pointer;
+    padding:9px 16px; background:#171b21; color:var(--text);
+    transition: border-color .15s, background .15s, opacity .15s;
+  }
+  button:hover{ border-color:#3a3f4a; }
+  button.primary{ background: var(--green); color:#04170c; border-color:var(--green); }
+  button.primary:hover{ filter:brightness(1.08); }
+  button:disabled{ opacity:0.5; cursor:default; }
+
+  .chip-group{ display:flex; flex-direction:column; gap:6px; }
+  .chip-group label.title{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+  .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .chip{
+    display:flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:12px;
+    background:#0d1014; border:1px solid var(--line); border-radius:20px; padding:6px 12px; cursor:pointer;
+    user-select:none; color: var(--text-dim);
+  }
+  .chip input{ accent-color: var(--green); }
+  .chip.active{ border-color: var(--green); color: var(--text); }
+
+  .toggle-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim); }
+  .toggle-row input{ accent-color: var(--violet); width:15px; height:15px; }
+  .toggle-row b{ color:var(--text); }
+
+  .scan-bar{ display:flex; align-items:center; gap:10px; margin-top: 12px; }
+  .scan-track{ flex:1; height:6px; background:#1c2027; border-radius:4px; overflow:hidden; min-width: 140px; }
+  .scan-fill{ height:100%; background: linear-gradient(90deg, var(--violet), var(--green)); border-radius:4px; width:0%; transition: width .25s; }
+  .scan-label{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-dim); }
+
+  .opps-title{ display:flex; align-items:center; gap:10px; margin: 8px 0 10px; }
+  .opps-title h2{ font-size:15px; margin:0; font-weight:700; }
+  .opps-title .count{
+    font-family:'IBM Plex Mono', monospace; font-size:11px; color:#04170c;
+    background: var(--green); padding:2px 8px; border-radius:20px; font-weight:700;
+  }
+  .opp-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); gap:10px; margin-bottom:26px; }
+  .opp-card{
+    background: linear-gradient(160deg, rgba(57,255,136,0.08), rgba(18,21,26,0.9));
+    border:1px solid rgba(57,255,136,0.35); border-radius:10px; padding:14px;
+    animation: pulse 1.8s ease-in-out 1;
+  }
+  @keyframes pulse{ 0%{ box-shadow: 0 0 0 1px rgba(57,255,136,0.6); } 100%{ box-shadow: 0 0 0 0 rgba(57,255,136,0); } }
+  .opp-card .top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .opp-sym{ font-weight:700; font-size:15px; }
+  .opp-mcap{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; color: var(--text-dim); }
+  .opp-spread{ font-family:'IBM Plex Mono', monospace; font-size:22px; font-weight:700; color: var(--green); margin: 6px 0 4px; }
+  .opp-route{ font-size:12px; color: var(--text-dim); line-height:1.5; }
+  .opp-route b{ color: var(--text); }
+  .opp-net{ display:inline-block; font-family:'IBM Plex Mono', monospace; font-size:10px; padding:1px 7px; border-radius:10px; margin-left:4px; }
+  .opp-net.high{ background: rgba(57,255,136,0.15); color: var(--green); }
+  .opp-net.check{ background: rgba(255,176,32,0.15); color: var(--amber); }
+  .opp-link{ display:inline-block; margin-top:8px; font-size:11px; color: var(--violet); text-decoration:none; }
+  .opp-link:hover{ text-decoration:underline; }
+  .opps-empty{
+    background: var(--bg-panel); border:1px dashed var(--line); border-radius:10px;
+    padding: 22px; text-align:center; color: var(--text-dim); font-size:13px; margin-bottom:26px;
+  }
+
+  .table-wrap{ background: var(--bg-panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; }
+  thead th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em; color: var(--text-dim); font-weight:600; padding: 12px 14px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th.num, td.num{ text-align:right; }
+  tbody td{ padding: 12px 14px; font-family:'IBM Plex Mono', monospace; font-size:12px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background: #171b21; }
+  .sym{ font-family:'Inter',sans-serif; font-weight:600; font-size:13px; }
+  .addr{ color: var(--text-dim); font-size:10px; }
+  .spread-val{ font-weight:700; font-size:13px; }
+  .spread-val.hot{ color: var(--green); }
+  .spread-val.warm{ color: var(--amber); }
+  .spread-val.cold{ color: var(--text-dim); }
+  .route{ font-size:11px; color: var(--text-dim); }
+  .route b{ color: var(--text); font-weight:600; }
+  .tag{ font-family:'IBM Plex Mono', monospace; font-size:9.5px; padding:1px 6px; border-radius:8px; }
+  .tag.high{ background: rgba(57,255,136,0.15); color: var(--green); }
+  .tag.check{ background: rgba(255,176,32,0.15); color: var(--amber); }
+  .empty{ padding: 40px 20px; text-align:center; color: var(--text-dim); font-size:13px; }
+  .section-label{ font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin: 4px 0 10px; }
+
+  footer{ margin-top:22px; font-size:11.5px; color: var(--text-dim); line-height:1.7; border-top:1px solid var(--line); padding-top:16px; }
+  footer b{ color: var(--text); }
+  footer .warn{ color: var(--amber); }
+
+  @media (max-width: 680px){
+    .status-cluster{ display:none; }
+    thead{ display:none; }
+    table, tbody, tr, td{ display:block; width:100%; }
+    tbody tr{ padding:12px 14px; border-bottom:1px solid var(--line); }
+    tbody td{ border:none; padding:3px 0; display:flex; justify-content:space-between; gap:8px; }
+    tbody td::before{ content: attr(data-label); color:var(--text-dim); font-size:10px; text-transform:uppercase; flex-shrink:0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="eyebrow">Spread Watch · Multi-Exchange · Multi-Rede</span>
+      <h1>Monitor de arbitragem — CEX x DEX</h1>
+      <span class="sub">Varre os pares USDT das exchanges selecionadas (via CoinGecko), cruza com tokens existentes nas redes DEX selecionadas, e mostra rotas de arbitragem batendo rede com rede.</span>
+    </div>
+    <div class="status-cluster">
+      <div class="status-item"><span class="dot" id="dot-cex"></span><span id="txt-cex">Exchanges (via CoinGecko)</span></div>
+      <div class="status-item"><span class="dot" id="dot-dex"></span><span id="txt-dex">DexScreener</span></div>
+      <div class="status-item"><span class="dot" id="dot-clock"></span><span id="txt-clock">—</span></div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="panel-title">Exchanges (CEX) a escanear</div>
+    <div class="chips" id="chips-exchanges"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Redes DEX a rastrear</div>
+    <div class="chips" id="chips-chains"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Filtros</div>
+    <div class="controls">
+      <div class="field">
+        <label>Mcap mínimo (USD)</label>
+        <input type="number" id="mcap-min" value="0" step="500000">
+      </div>
+      <div class="field">
+        <label>Mcap máximo (USD)</label>
+        <input type="number" id="mcap-max" value="20000000" step="1000000">
+      </div>
+      <div class="field">
+        <label>Spread mínimo (%)</label>
+        <input type="number" id="threshold" value="3" min="0" step="0.5">
+      </div>
+      <div class="field">
+        <label>Atualizar a cada (s)</label>
+        <input type="number" id="interval" value="30" min="15" step="5">
+      </div>
+      <button id="btn-scan" class="primary">Escanear mercados</button>
+      <button id="btn-apply">Aplicar filtros</button>
+    </div>
+    <div class="toggle-row" style="margin-top:14px;">
+      <input type="checkbox" id="hide-ambiguous" checked>
+      <label for="hide-ambiguous">Mostrar só tokens de <b>rede única</b> (mais seguro — esconde tokens que existem em mais de uma rede, onde não dá pra confirmar via API qual rede a corretora libera pro saque)</label>
+    </div>
+    <div class="scan-bar">
+      <div class="scan-track"><div class="scan-fill" id="scan-fill"></div></div>
+      <span class="scan-label" id="scan-label">clique em escanear para começar</span>
+    </div>
+  </div>
+
+  <div class="opps-title">
+    <h2>Oportunidades acima do gatilho</h2>
+    <span class="count" id="opps-count">0</span>
+  </div>
+  <div id="opps-container"><div class="opps-empty">Nenhuma oportunidade ainda. Escaneie o mercado para começar a monitorar.</div></div>
+
+  <div class="section-label">Todas as rotas monitoradas</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Rede</th>
+          <th class="num">Mcap</th>
+          <th class="num">Preço CEX</th>
+          <th class="num">Preço DEX</th>
+          <th>Rota</th>
+          <th class="num">Spread</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="7" class="empty">Nenhuma rota escaneada ainda.</td></tr></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <b>Como funciona:</b> 1) resolve o ID exato de cada exchange marcada acima direto na CoinGecko (evita erro de nome); 2) busca todos os pares USDT que cada exchange negocia; 3) usa a lista de moedas da CoinGecko (com endereços de contrato por rede) pra saber em quais das redes marcadas acima cada token existe; 4) mantém só os que têm mcap dentro da faixa definida; 5) para cada combinação exchange + rede em que o token existe, busca o pool DEX mais líquido <b>naquela rede específica</b> e compara o preço — nunca mistura rede errada com exchange errada.<br><br>
+    <b class="warn">Sobre a checagem de rede:</b> a API pública não revela quais redes de saque cada exchange libera pra cada moeda especificamente (isso fica atrás de login). O que o painel faz é estimar por <b>existência do token</b>: se o token só existe numa única rede (ex: só Solana), a etiqueta fica "rede única" — alta confiança de que é essa a rede de saque. Se o token existe em várias redes (ex: ETH e SOL ao mesmo tempo, como no caso que você viu), a etiqueta fica "confirmar" e a rota fica escondida por padrão (dá pra reativar no filtro acima) — <b>sempre confira manualmente a rede de saque disponível na tela de saque da corretora antes de transferir</b>, mesmo nas marcadas como "rede única".<br><br>
+    <b>Limitações:</b> a API pública do CoinGecko tem limite de requisições — quanto mais exchanges e redes marcadas, mais lento e mais chance de erro de limite de taxa (espere um pouco e escaneie de novo se acontecer). Preços de CEX vêm agregados pela CoinGecko, podendo ter pequeno atraso. Este painel só lê preços públicos: não guarda chave de API seleta sua, não acessa sua conta e não executa nenhuma ordem.
+  </footer>
+
+</div>
+
+<script>
+const CG_BASE = 'https://api.coingecko.com/api/v3';
+const CG_EXCHANGES_LIST = CG_BASE + '/exchanges/list';
+const CG_EXCHANGE_TICKERS = (exId, page, coinIds) => `${CG_BASE}/exchanges/${exId}/tickers?page=${page}${coinIds ? '&coin_ids=' + coinIds : ''}`;
+const CG_COINS_LIST = CG_BASE + '/coins/list?include_platform=true';
+const CG_COINS_MARKETS = (ids) => `${CG_BASE}/coins/markets?vs_currency=usd&ids=${ids}&per_page=250&page=1`;
+const DEXSCREENER_TOKEN = (addr) => `https://api.dexscreener.com/latest/dex/tokens/${addr}`;
+let CG_API_KEY = 'CG-EsMrQA1e9w7XfLuSL7pqfEAr';
+
+// Exchanges we support scanning. cgId is resolved at runtime against
+// /exchanges/list so small naming differences on CoinGecko's side don't
+// silently break the scan.
+const EXCHANGE_DEFS = [
+  { key: 'bingx',   label: 'BingX',   match: n => n.includes('bingx'), checked: true },
+  { key: 'binance', label: 'Binance', match: n => n === 'binance', checked: true },
+  { key: 'gate',    label: 'Gate.io', match: n => n.includes('gate.io') || n === 'gate', checked: true },
+];
+
+// CoinGecko platform key -> DexScreener chainId + short label.
+const CHAIN_DEFS = [
+  { key: 'solana',                label: 'SOL',       dexId: 'solana',     checked: true },
+  { key: 'ethereum',              label: 'ETH',        dexId: 'ethereum',   checked: true },
+  { key: 'binance-smart-chain',   label: 'BSC',        dexId: 'bsc',        checked: true },
+  { key: 'polygon-pos',           label: 'POLYGON',    dexId: 'polygon',    checked: false },
+  { key: 'arbitrum-one',          label: 'ARBITRUM',   dexId: 'arbitrum',   checked: false },
+  { key: 'base',                  label: 'BASE',       dexId: 'base',       checked: false },
+  { key: 'avalanche',             label: 'AVALANCHE',  dexId: 'avalanche',  checked: false },
+];
+
+let mcapMin = 0;
+let mcapMax = 20000000;
+let threshold = 3;
+let intervalSec = 30;
+let hideAmbiguous = true;
+let timer = null;
+let scanning = false;
+let candidates = []; // routes: { symbol, coinId, exId, exLabel, chainKey, chainLabel, dexId, address, mcap, cexPrice, dexPrice, dexSource, pairUrl, confidence }
+let resolvedExchangeIds = null; // { key -> cgId or null }
+
+function setDot(id, state){
+  const dot = document.getElementById(id);
+  dot.classList.remove('ok','err','pending');
+  if(state) dot.classList.add(state);
+}
+function fmtPrice(p){
+  if(p === null || p === undefined || isNaN(p)) return '—';
+  if(p >= 1) return '$' + p.toFixed(4);
+  if(p >= 0.0001) return '$' + p.toFixed(6);
+  return '$' + p.toExponential(3);
+}
+function fmtMcap(m){
+  if(!m) return '—';
+  if(m >= 1e6) return '$' + (m/1e6).toFixed(2) + 'M';
+  if(m >= 1e3) return '$' + (m/1e3).toFixed(0) + 'k';
+  return '$' + m.toFixed(0);
+}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function fetchJSON(url){
+  for(let attempt = 0; attempt < 3; attempt++){
+    const res = await fetch(url);
+    if(res.status === 429){ await sleep(2500 * (attempt + 1)); continue; }
+    if(!res.ok) throw new Error('http ' + res.status);
+    return await res.json();
+  }
+  throw new Error('rate limited');
+}
+
+async function fetchCGJSON(url){
+  const withKey = url + (url.includes('?') ? '&' : '?') + 'x_cg_demo_api_key=' + encodeURIComponent(CG_API_KEY);
+  for(let attempt = 0; attempt < 3; attempt++){
+    const res = await fetch(withKey);
+    if(res.status === 429){ await sleep(2500 * (attempt + 1)); continue; }
+    if(res.status === 401 || res.status === 403) throw new Error('chave da API inválida ou ausente');
+    if(!res.ok) throw new Error('http ' + res.status);
+    return await res.json();
+  }
+  throw new Error('limite de requisições atingido');
+}
+
+// --- UI: build exchange / chain chip pickers ---
+function buildChips(){
+  const exWrap = document.getElementById('chips-exchanges');
+  exWrap.innerHTML = EXCHANGE_DEFS.map(e => `
+    <label class="chip ${e.checked ? 'active' : ''}" data-kind="ex" data-key="${e.key}">
+      <input type="checkbox" ${e.checked ? 'checked' : ''}> ${e.label}
+    </label>`).join('');
+
+  const chWrap = document.getElementById('chips-chains');
+  chWrap.innerHTML = CHAIN_DEFS.map(c => `
+    <label class="chip ${c.checked ? 'active' : ''}" data-kind="chain" data-key="${c.key}">
+      <input type="checkbox" ${c.checked ? 'checked' : ''}> ${c.label}
+    </label>`).join('');
+
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('change', () => {
+      const cb = chip.querySelector('input');
+      chip.classList.toggle('active', cb.checked);
+      const kind = chip.getAttribute('data-kind');
+      const key = chip.getAttribute('data-key');
+      const list = kind === 'ex' ? EXCHANGE_DEFS : CHAIN_DEFS;
+      const def = list.find(d => d.key === key);
+      if(def) def.checked = cb.checked;
+    });
+  });
+}
+
+function activeExchanges(){ return EXCHANGE_DEFS.filter(e => e.checked); }
+function activeChains(){ return CHAIN_DEFS.filter(c => c.checked); }
+
+// Resolve each selected exchange's exact CoinGecko id by matching against
+// the live /exchanges/list, instead of guessing a slug that might be wrong.
+async function resolveExchangeIds(){
+  if(resolvedExchangeIds) return resolvedExchangeIds;
+  const list = await fetchCGJSON(CG_EXCHANGES_LIST);
+  const map = {};
+  EXCHANGE_DEFS.forEach(def => {
+    const found = (list || []).find(x => {
+      const name = (x.name || '').toLowerCase();
+      const id = (x.id || '').toLowerCase();
+      return def.match(name) || def.match(id);
+    });
+    map[def.key] = found ? found.id : null;
+  });
+  resolvedExchangeIds = map;
+  return map;
+}
+
+async function fetchAllTickersFor(exId, onProgress){
+  let all = [];
+  let page = 1;
+  while(page <= 40){
+    const json = await fetchCGJSON(CG_EXCHANGE_TICKERS(exId, page));
+    const tickers = (json && json.tickers) ? json.tickers : [];
+    if(!tickers.length) break;
+    all = all.concat(tickers.filter(t => t.target === 'USDT' && t.coin_id));
+    if(onProgress) onProgress(page, all.length);
+    page++;
+    await sleep(1500);
+  }
+  return all;
+}
+
+async function fetchPlatformMap(){
+  const json = await fetchCGJSON(CG_COINS_LIST);
+  const map = {}; // coinId -> { chainKey: address, ... }
+  (json || []).forEach(c => {
+    if(c.platforms){
+      const entries = {};
+      let any = false;
+      Object.keys(c.platforms).forEach(pk => {
+        if(c.platforms[pk]){ entries[pk] = c.platforms[pk]; any = true; }
+      });
+      if(any) map[c.id] = entries;
+    }
+  });
+  return map;
+}
+
+async function fetchMarketCaps(ids){
+  const result = {};
+  for(let i = 0; i < ids.length; i += 200){
+    const chunk = ids.slice(i, i + 200);
+    if(!chunk.length) continue;
+    const json = await fetchCGJSON(CG_COINS_MARKETS(chunk.join(',')));
+    (json || []).forEach(m => { result[m.id] = { mcap: m.market_cap, price: m.current_price }; });
+    await sleep(1500);
+  }
+  return result;
+}
+
+async function fetchDexPriceForAddress(address, dexId){
+  const json = await fetchJSON(DEXSCREENER_TOKEN(address));
+  const pairs = (json.pairs || []).filter(p => p.chainId === dexId && p.priceUsd);
+  if(!pairs.length) return null;
+  pairs.sort((a,b) => (b.liquidity ? b.liquidity.usd : 0) - (a.liquidity ? a.liquidity.usd : 0));
+  const best = pairs[0];
+  return {
+    price: parseFloat(best.priceUsd),
+    source: best.dexId ? best.dexId.charAt(0).toUpperCase() + best.dexId.slice(1) : 'DEX',
+    liquidity: best.liquidity ? best.liquidity.usd : null,
+    url: best.url,
+  };
+}
+
+async function runScan(){
+  if(scanning) return;
+  const exSel = activeExchanges();
+  const chainSel = activeChains();
+  if(!exSel.length){ document.getElementById('scan-label').textContent = 'marque pelo menos uma exchange.'; return; }
+  if(!chainSel.length){ document.getElementById('scan-label').textContent = 'marque pelo menos uma rede.'; return; }
+
+  scanning = true;
+  document.getElementById('btn-scan').disabled = true;
+  setDot('dot-cex', 'pending');
+  setDot('dot-dex', 'pending');
+  document.getElementById('scan-label').textContent = 'resolvendo IDs das exchanges na CoinGecko…';
+
+  let exIdMap;
+  try {
+    exIdMap = await resolveExchangeIds();
+  } catch(e){
+    setDot('dot-cex', 'err');
+    document.getElementById('scan-label').textContent = 'falha ao acessar o CoinGecko — erro técnico: ' + e.message + '. Tente escanear de novo em instantes.';
+    document.getElementById('btn-scan').disabled = false;
+    scanning = false;
+    return;
+  }
+
+  const missing = exSel.filter(e => !exIdMap[e.key]);
+  if(missing.length){
+    document.getElementById('scan-label').textContent = `atenção: não encontrei "${missing.map(m=>m.label).join(', ')}" na CoinGecko — seguindo só com as demais.`;
+    await sleep(800);
+  }
+  const usableEx = exSel.filter(e => exIdMap[e.key]);
+  if(!usableEx.length){
+    setDot('dot-cex', 'err');
+    document.getElementById('scan-label').textContent = 'nenhuma das exchanges marcadas foi encontrada na CoinGecko.';
+    document.getElementById('btn-scan').disabled = false;
+    scanning = false;
+    return;
+  }
+
+  // 1) Tickers per exchange -> per-exchange coin map
+  const perExchangeCoins = {}; // exKey -> { coinId -> { symbol, cexPrice } }
+  try {
+    for(const e of usableEx){
+      document.getElementById('scan-label').textContent = `lendo pares USDT da ${e.label}…`;
+      const tickers = await fetchAllTickersFor(exIdMap[e.key], (page, count) => {
+        document.getElementById('scan-label').textContent = `${e.label}: página ${page}, ${count} pares USDT até agora`;
+      });
+      const map = {};
+      tickers.forEach(t => {
+        if(!map[t.coin_id]) map[t.coin_id] = { symbol: t.base, cexPrice: (t.converted_last && t.converted_last.usd) || null };
+      });
+      perExchangeCoins[e.key] = map;
+    }
+    setDot('dot-cex', 'ok');
+  } catch(e){
+    setDot('dot-cex', 'err');
+    document.getElementById('scan-label').textContent = 'falha ao acessar o CoinGecko — erro técnico: ' + e.message + '. Tente escanear de novo em instantes.';
+    document.getElementById('btn-scan').disabled = false;
+    scanning = false;
+    return;
+  }
+
+  const unionIds = new Set();
+  usableEx.forEach(e => Object.keys(perExchangeCoins[e.key]).forEach(id => unionIds.add(id)));
+  const allIds = Array.from(unionIds);
+  document.getElementById('scan-label').textContent = `${allIds.length} moedas únicas nas exchanges marcadas. Cruzando com endereços de contrato…`;
+
+  let platformMap;
+  try {
+    platformMap = await fetchPlatformMap();
+  } catch(e){
+    setDot('dot-dex', 'err');
+    document.getElementById('scan-label').textContent = 'falha ao buscar a lista de tokens do CoinGecko. Tente escanear de novo.';
+    document.getElementById('btn-scan').disabled = false;
+    scanning = false;
+    return;
+  }
+
+  document.getElementById('scan-label').textContent = 'buscando market cap…';
+  let mcapData;
+  try {
+    mcapData = await fetchMarketCaps(allIds);
+  } catch(e){
+    document.getElementById('scan-label').textContent = 'falha ao buscar market cap. Tente escanear de novo.';
+    document.getElementById('btn-scan').disabled = false;
+    scanning = false;
+    return;
+  }
+
+  // 2) Build candidate routes: one per (exchange, coin, active chain the coin exists on)
+  const activeChainKeys = chainSel.map(c => c.key);
+  const routeSeeds = [];
+  allIds.forEach(id => {
+    const mcapInfo = mcapData[id];
+    if(!mcapInfo || !mcapInfo.mcap) return;
+    if(mcapInfo.mcap < mcapMin || mcapInfo.mcap > mcapMax) return;
+    const platforms = platformMap[id];
+    if(!platforms) return;
+    const totalChainsForToken = Object.keys(platforms).length;
+    const confidence = totalChainsForToken <= 1 ? 'high' : 'check';
+    if(hideAmbiguous && confidence === 'check') return;
+
+    const matchingChains = chainSel.filter(c => platforms[c.key]);
+    if(!matchingChains.length) return;
+
+    usableEx.forEach(e => {
+      const coinOnEx = perExchangeCoins[e.key][id];
+      if(!coinOnEx) return;
+      matchingChains.forEach(c => {
+        routeSeeds.push({
+          symbol: (coinOnEx.symbol || id).toUpperCase(),
+          coinId: id,
+          exKey: e.key,
+          exLabel: e.label,
+          chainKey: c.key,
+          chainLabel: c.label,
+          dexId: c.dexId,
+          address: platforms[c.key],
+          mcap: mcapInfo.mcap,
+          cexPrice: mcapInfo.price || coinOnEx.cexPrice,
+          confidence,
+        });
+      });
+    });
+  });
+
+  document.getElementById('scan-label').textContent = `${routeSeeds.length} rotas candidatas. Confirmando preço nos pools DEX…`;
+
+  const found = [];
+  const total = routeSeeds.length || 1;
+  let idx = 0;
+  let dexEverOk = false;
+  const concurrency = 5;
+
+  async function worker(){
+    while(idx < routeSeeds.length){
+      const my = idx++;
+      const seed = routeSeeds[my];
+      try {
+        const dex = await fetchDexPriceForAddress(seed.address, seed.dexId);
+        if(dex){
+          dexEverOk = true;
+          found.push(Object.assign({}, seed, {
+            dexPrice: dex.price,
+            dexSource: dex.source,
+            pairUrl: dex.url,
+            poolLiquidity: dex.liquidity,
+          }));
+        }
+      } catch(e){ /* skip this route */ }
+      const pct = Math.round(((my+1)/total)*100);
+      document.getElementById('scan-fill').style.width = pct + '%';
+      document.getElementById('scan-label').textContent = `verificando pools ${my+1}/${routeSeeds.length}… (${found.length} confirmadas)`;
+      await sleep(150);
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(concurrency, routeSeeds.length || 1)}, worker));
+  setDot('dot-dex', dexEverOk ? 'ok' : 'err');
+
+  candidates = found;
+  document.getElementById('scan-label').textContent = `escaneamento concluído: ${found.length} rotas confirmadas.`;
+  document.getElementById('btn-scan').disabled = false;
+  scanning = false;
+
+  runCycle();
+}
+
+async function refreshCandidateFast(c, cexPriceLive){
+  let dexPrice = c.dexPrice, dexSource = c.dexSource, pairUrl = c.pairUrl;
+  try {
+    const dex = await fetchDexPriceForAddress(c.address, c.dexId);
+    if(dex){ dexPrice = dex.price; dexSource = dex.source; pairUrl = dex.url; }
+  } catch(e){ /* keep last known dex price */ }
+
+  const cexPrice = cexPriceLive || c.cexPrice;
+  if(!cexPrice || !dexPrice) return { c: Object.assign({}, c, { dexPrice, dexSource, pairUrl }), spread: null };
+
+  const min = cexPrice <= dexPrice ? { source: c.exLabel, price: cexPrice } : { source: dexSource, price: dexPrice };
+  const max = cexPrice <= dexPrice ? { source: dexSource, price: dexPrice } : { source: c.exLabel, price: cexPrice };
+  const spread = ((max.price - min.price) / min.price) * 100;
+  return { c: Object.assign({}, c, { cexPrice, dexPrice, dexSource, pairUrl }), spread, min, max };
+}
+
+async function runCycle(){
+  if(candidates.length === 0){
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="7" class="empty">Nenhuma rota ainda — clique em "Escanear mercados".</td></tr>';
+    document.getElementById('opps-container').innerHTML = '<div class="opps-empty">Nenhuma oportunidade ainda. Escaneie o mercado para começar a monitorar.</div>';
+    document.getElementById('opps-count').textContent = '0';
+    return;
+  }
+
+  // Refresh CEX prices per exchange in one batched call each.
+  const cexMapByEx = {};
+  try {
+    const exIdMap = await resolveExchangeIds();
+    const byExchange = {};
+    candidates.forEach(c => {
+      if(!byExchange[c.exKey]) byExchange[c.exKey] = new Set();
+      byExchange[c.exKey].add(c.coinId);
+    });
+    for(const exKey of Object.keys(byExchange)){
+      const ids = Array.from(byExchange[exKey]).join(',');
+      const json = await fetchCGJSON(CG_EXCHANGE_TICKERS(exIdMap[exKey], 1, ids));
+      const map = {};
+      (json.tickers || []).forEach(t => {
+        if(t.target === 'USDT' && t.coin_id && t.converted_last && t.converted_last.usd){
+          map[t.coin_id] = t.converted_last.usd;
+        }
+      });
+      cexMapByEx[exKey] = map;
+    }
+    setDot('dot-cex', 'ok');
+  } catch(e){
+    setDot('dot-cex', 'err');
+  }
+
+  const results = await Promise.all(candidates.map(c => refreshCandidateFast(c, cexMapByEx[c.exKey] && cexMapByEx[c.exKey][c.coinId])));
+  results.sort((a,b) => (b.spread ?? -1) - (a.spread ?? -1));
+
+  const opps = results.filter(r => r.spread !== null && r.spread >= threshold);
+  document.getElementById('opps-count').textContent = String(opps.length);
+  document.getElementById('opps-container').innerHTML = opps.length
+    ? `<div class="opp-grid">${opps.map(renderOppCard).join('')}</div>`
+    : '<div class="opps-empty">Nenhum spread acima do gatilho neste ciclo.</div>';
+
+  document.getElementById('tbody').innerHTML = results.map(renderRow).join('');
+
+  setDot('dot-clock', 'ok');
+  document.getElementById('txt-clock').textContent = new Date().toLocaleTimeString('pt-BR');
+}
+
+function renderOppCard(r){
+  const netTag = r.c.confidence === 'high' ? '<span class="opp-net high">rede única</span>' : '<span class="opp-net check">confirmar rede</span>';
+  return `<div class="opp-card">
+    <div class="top">
+      <span class="opp-sym">${r.c.symbol}</span>
+      <span class="opp-mcap">${fmtMcap(r.c.mcap)}</span>
+    </div>
+    <div class="opp-spread">${r.spread.toFixed(2)}%</div>
+    <div class="opp-route">compre <b>${r.c.symbol}</b> na <b>${r.c.exLabel}</b><br>venda na <b>${r.c.dexSource}</b> (rede ${r.c.chainLabel}) ${netTag}</div>
+    <a class="opp-link" href="${r.c.pairUrl}" target="_blank" rel="noopener">ver no DexScreener →</a>
+  </div>`;
+}
+
+function renderRow(r){
+  const tag = r.c.confidence === 'high' ? '<span class="tag high">rede única</span>' : '<span class="tag check">confirmar</span>';
+  if(r.spread === null){
+    return `<tr>
+      <td data-label="Token"><div class="sym">${r.c.symbol}</div><div class="addr">${r.c.address.slice(0,4)}…${r.c.address.slice(-4)}</div></td>
+      <td data-label="Rede">${r.c.chainLabel} ${tag}</td>
+      <td class="num" data-label="Mcap">${fmtMcap(r.c.mcap)}</td>
+      <td class="num" data-label="Preço CEX">—</td>
+      <td class="num" data-label="Preço DEX">—</td>
+      <td data-label="Rota"><span class="route">sem dados nesta rodada</span></td>
+      <td class="num" data-label="Spread">—</td>
+    </tr>`;
+  }
+  const cls = r.spread >= threshold ? 'hot' : (r.spread >= threshold/2 ? 'warm' : 'cold');
+  return `<tr>
+    <td data-label="Token"><div class="sym">${r.c.symbol}</div><div class="addr">${r.c.address.slice(0,4)}…${r.c.address.slice(-4)}</div></td>
+    <td data-label="Rede">${r.c.chainLabel} ${tag}</td>
+    <td class="num" data-label="Mcap">${fmtMcap(r.c.mcap)}</td>
+    <td class="num" data-label="Preço CEX">${fmtPrice(r.c.cexPrice)}<br>${r.c.exLabel}</td>
+    <td class="num" data-label="Preço DEX">${fmtPrice(r.c.dexPrice)}<br>${r.c.dexSource}</td>
+    <td data-label="Rota"><span class="route">comprar em <b>${r.min.source}</b> → vender em <b>${r.max.source}</b></span></td>
+    <td class="num" data-label="Spread"><span class="spread-val ${cls}">${r.spread.toFixed(2)}%</span></td>
+  </tr>`;
+}
+
+function scheduleLoop(){
+  if(timer) clearInterval(timer);
+  timer = setInterval(runCycle, intervalSec * 1000);
+}
+
+document.getElementById('btn-scan').addEventListener('click', runScan);
+document.getElementById('btn-apply').addEventListener('click', () => {
+  mcapMin = parseFloat(document.getElementById('mcap-min').value) || 0;
+  mcapMax = parseFloat(document.getElementById('mcap-max').value) || 20000000;
+  threshold = parseFloat(document.getElementById('threshold').value) || 3;
+  intervalSec = Math.max(15, parseInt(document.getElementById('interval').value) || 30);
+  hideAmbiguous = document.getElementById('hide-ambiguous').checked;
+  candidates = candidates.filter(c => c.mcap && c.mcap >= mcapMin && c.mcap <= mcapMax && (!hideAmbiguous || c.confidence === 'high'));
+  scheduleLoop();
+  runCycle();
+});
+document.getElementById('hide-ambiguous').addEventListener('change', (e) => { hideAmbiguous = e.target.checked; });
+
+buildChips();
+scheduleLoop();
+</script>
+</body>
+</html>
